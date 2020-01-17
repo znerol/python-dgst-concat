@@ -8,6 +8,15 @@ from pathlib import Path
 
 DigestEntry = namedtuple('DigestEntry', ['digest', 'flag', 'path'])
 
+class DigestError(Exception):
+    pass
+
+class DigestParserError(DigestError):
+    pass
+
+class DigestFileError(DigestError):
+    pass
+
 class DigestParser(object):
     """
     Parse digest files in coreutils md5sum / shasum format.
@@ -33,7 +42,7 @@ class DigestParser(object):
                        flag=result.group('flag'),
                        path=result.group('path'))
             else:
-                raise RuntimeError(f'Unexpected line {line}')
+                raise DigestParserError(f'Unexpected line {line}')
 
 
 class DigestList(object):
@@ -46,17 +55,20 @@ class DigestList(object):
         """
         Walk through the list coreutils digest files and concatenate them.
 
-        For each digest encountered in each file, the path is prependen with
+        For each digest encountered in each file, the path is prepended with
         the path to the enclosing directory.
         """
         for dgstfile in paths:
             dirname = dgstfile.parent
             with dgstfile.open() as lines:
-                for entry in self.parser.parse(lines):
-                    yield DigestEntry(
-                            digest=entry.digest,
-                            flag=entry.flag,
-                            path=dirname.joinpath(entry.path))
+                try:
+                    for entry in self.parser.parse(lines):
+                        yield DigestEntry(
+                                digest=entry.digest,
+                                flag=entry.flag,
+                                path=dirname.joinpath(entry.path))
+                except DigestParserError as e:
+                    raise DigestFileError(f'Failed while parsing {dgstfile}') from e
 
 
 if __name__ == "__main__":
