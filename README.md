@@ -8,7 +8,7 @@ Usage
 -----
 
 ```
-usage: dgst-concat.py [-h] [-o [OUTFILE]] PATTERN [PATTERN ...]
+usage: dgst-concat.py [-h] [-d] [-o OUTFILE] PATTERN [PATTERN ...]
 
 Recursively concatenate coreutils digest files.
 
@@ -17,7 +17,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -o [OUTFILE], --outfile [OUTFILE]
+  -d, --debug           print a stacktrace when something goes wrong
+  -o OUTFILE, --outfile OUTFILE
                         output file, defaults to standard output
 ```
 
