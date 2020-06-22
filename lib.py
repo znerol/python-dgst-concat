@@ -51,6 +51,10 @@ class DigestList(object):
     """
     parser = DigestParser()
 
+    def __init__(self, flat=False, flag=None):
+        self.flat = flat
+        self.flag = flag
+
     def join(self, paths):
         """
         Walk through the list coreutils digest files and concatenate them.
@@ -65,7 +69,7 @@ class DigestList(object):
                     for entry in self.parser.parse(lines):
                         yield DigestEntry(
                                 digest=entry.digest,
-                                flag=entry.flag,
-                                path=dirname.joinpath(entry.path))
+                                flag=entry.flag if self.flag is None else self.flag,
+                                path=entry.path if self.flat else dirname / entry.path)
                 except DigestParserError as e:
                     raise DigestFileError(f'Failed while parsing "{dgstfile}", {e}') from e
