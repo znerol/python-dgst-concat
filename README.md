@@ -1,11 +1,15 @@
 Digest Concat
 =============
 
-A python 3 script to collect and concatenate coreutils digest files.
+A collection of python 3 scripts to collect and concatenate coreutils digest
+files.
 
 
 Usage
 -----
+
+dgst-concat.py
+==============
 
 ```
 usage: dgst-concat.py [-h] [-d] [-o OUTFILE] PATTERN [PATTERN ...]
@@ -22,8 +26,26 @@ optional arguments:
                         output file, defaults to standard output
 ```
 
+dgst-concat-dir.py
+==================
+
+```
+usage: dgst-concat-dir.py [-h] [-d] [-o OUTNAME] PATTERN [PATTERN ...]
+
+Recursively walk a filesystem hierarchy and concatenate digest files into one
+file per directory.
+
+positional arguments:
+  PATTERN               glob pattern for digest files. E.g., "*.md5"
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d, --debug           print a stacktrace when something goes wrong
+  -o OUTNAME, --outname OUTNAME
+                        output file name
+```
 
 License
 -------
 
-Digest concat source code is in the [public-domain](LICENSE) and is free to everyone to use for any purpose. 
+Digest concat source code is in the [public-domain](LICENSE) and is free to everyone to use for any purpose.
