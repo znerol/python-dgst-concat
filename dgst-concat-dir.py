@@ -38,9 +38,12 @@ if __name__ == "__main__":
         flag = ' '
 
     for (dirpath, _, _) in os.walk(Path('.')):
+        outpath = Path(dirpath) / args.outname
         for pattern in args.patterns:
             dgstfiles = list(Path(dirpath).glob(pattern))
+            while outpath in dgstfiles:
+                dgstfiles.remove(outpath)
             if dgstfiles:
-                with (Path(dirpath) / args.outname).open('w') as outfile:
+                with outpath.open('w') as outfile:
                     for entry in DigestList(flat=True, flag=flag).join(dgstfiles):
                         print(f'{entry.digest} {entry.flag}{entry.path}', file=outfile)
