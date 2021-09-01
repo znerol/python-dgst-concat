@@ -24,7 +24,7 @@ class DigestFileError(DigestError):
     pass
 
 
-class DigestFormat(object):
+class DigestFileFormat(object):
     """
     Represents a digest text file format used to differentiate between POSIX
     und WINDOWS line- and path separators.
@@ -59,56 +59,139 @@ class DigestFormat(object):
         return self._pathcls(path)
 
 
-class DigestFormats(object):
+class DigestFileFormats(object):
     """
     Implements a simple mechanism to guess whether a digest file is in POSIX or
     WINDOWS format.
     """
 
-    NATIVE = DigestFormat(os.linesep, PurePath)
-    UNIX = DigestFormat('\n', PurePosixPath)
-    WINDOWS = DigestFormat('\r\n', PureWindowsPath)
+    NATIVE = DigestFileFormat(os.linesep, PurePath)
+    UNIX = DigestFileFormat('\n', PurePosixPath)
+    WINDOWS = DigestFileFormat('\r\n', PureWindowsPath)
 
     candidates = [WINDOWS, UNIX]
 
-    def guess(self, buf: io.BufferedReader) -> DigestFormat:
+    def guess(self, buf: io.BufferedReader) -> DigestFileFormat:
         """
-        Returns either DigestFormats.WINDOWS or DigestFormats.UNIX
+        Returns either DigestFileFormats.WINDOWS or DigestFileFormats.UNIX
         """
         for candidate in self.candidates:
             if candidate.match(buf):
                 return candidate
         else:
-            raise DigestFormatError(f'Failed to detect DOS or UNIX line '
+            raise DigestFormatError('Failed to detect DOS or UNIX line '
                                     'separator')
 
+class DigestLineFormat(object):
+    """
+    Abstract base class for regex based digest line parsers.
+    """
+
+    def __init__(self, pattern):
+        self._pattern = pattern
+
+    def match(self, buf: io.BufferedReader):
+        """
+        Return true if the parser matches the given line.
+        """
+        chunk = buf.peek().decode()
+        return self._pattern.match(chunk) is not None
+
+    def parse(self, line: str, filefmt: DigestFileFormat) -> DigestEntry:
+        """
+        Given a line and a filefmt, return a DigestEntry. Raises
+        DigestParserError on unexpected input.
+        """
+        result = self._pattern.match(line)
+        if result:
+            return self._construct_entry(result, filefmt)
+        else:
+            raise DigestParserError(f'Unexpected line "{line}"')
+
+    def _construct_entry(self, result: re.Match, filefmt: DigestFileFormat) -> DigestEntry:
+        """
+        Construct a DigestEntry from a match. Must be implemented by a subclass.
+        """
+        raise NotImplementedError()
+
+class DigestLineFormatCoreutils(DigestLineFormat):
+    """
+    Digest line parser for GNU coreutils md5sum file format.
+    """
+    def __init__(self):
+        super().__init__(re.compile(
+            r'(?P<digest>[0-9A-Fa-f]+) (?P<flag>[\* ])(?P<path>.*)'
+        ))
+
+    def _construct_entry(self, result: re.Match, filefmt: DigestFileFormat) -> DigestEntry:
+        return DigestEntry(
+            digest=result.group('digest'),
+            flag=result.group('flag'),
+            path=filefmt.path(result.group('path'))
+        )
+
+class DigestLineFormatBSDReversed(DigestLineFormat):
+    """
+    Digest line parser for reversed BSD md5 file format.
+    """
+    def __init__(self):
+        super().__init__(re.compile(
+            r'(?P<digest>[0-9A-Fa-f]+) (?P<path>.*)'
+        ))
+
+    def _construct_entry(self, result: re.Match, filefmt: DigestFileFormat) -> DigestEntry:
+        return DigestEntry(
+            digest=result.group('digest'),
+            flag=' ',
+            path=filefmt.path(result.group('path'))
+        )
+
+class DigestLineFormats(object):
+    """
+    Implements a simple mechanism to guess whether a digest line is in GNU
+    coreutils or reverse BSD format.
+    """
+
+    COREUTILS = DigestLineFormatCoreutils()
+    BSD_REVERSED = DigestLineFormatBSDReversed()
+
+    candidates = [COREUTILS, BSD_REVERSED]
+
+    def guess(self, buf: io.BufferedReader):
+        """
+        Returns either DigestLineFormats.COREUTILS or
+        DigestLineFormats.REVERSE_BSD
+        """
+        for candidate in self.candidates:
+            if candidate.match(buf):
+                return candidate
+        else:
+            raise DigestFormatError('Failed to detect GNU coreutils or '
+                                    'reverse BSD line format')
 
 class DigestParser(object):
     """
-    Parse digest files in coreutils md5sum / shasum format.
+    Parse digest files in coreutils md5sum / shasum and BSD reversed format.
 
     Files are expected to be in the format <digest>{space}<flag><path> where
     <digest> represents the md5 / sha hex digest, <flag> is either a space
     character (text mode) or an asterisk (binary mode) and <path> is the path
-    to the file.
+    to the file. Note: reversed BSD format lacks the flag column.
     """
-    pattern = re.compile(r'(?P<digest>[0-9A-Fa-f]+) (?P<flag>[\* ])(?P<path>.*)')
 
-    def parse(self, lines, fmt: DigestFormat = DigestFormats.NATIVE):
+    def parse(
+        self,
+        lines,
+        filefmt: DigestFileFormat = DigestFileFormats.NATIVE,
+        linefmt: DigestLineFormat = DigestLineFormats.COREUTILS
+    ):
         """
         Iterates through the list of lines and yields a DigestEntry for each of
         them. Throws a RuntimeException if a line does not match the expected
         format.
         """
         for line in lines:
-            result = self.pattern.match(line)
-            if result:
-                yield DigestEntry(
-                       digest=result.group('digest'),
-                       flag=result.group('flag'),
-                       path=fmt.path(result.group('path')))
-            else:
-                raise DigestParserError(f'Unexpected line "{line}"')
+            yield linefmt.parse(line, filefmt)
 
 
 class DigestList(object):
@@ -120,11 +203,13 @@ class DigestList(object):
                  flat=False,
                  flag=None,
                  parser: DigestParser = DigestParser(),
-                 formats: DigestFormats = DigestFormats()):
+                 filefmts: DigestFileFormats = DigestFileFormats(),
+                 linefmts: DigestLineFormats = DigestLineFormats()):
         self.flat = flat
         self.flag = flag
         self.parser = parser
-        self.formats = formats
+        self.filefmts = filefmts
+        self.linefmts = linefmts
 
     def join(self, paths):
         """
@@ -137,8 +222,14 @@ class DigestList(object):
             dirname = dgstfile.parent
             with dgstfile.open('rb') as buf:
                 try:
-                    fmt = self.formats.guess(buf)
-                    for entry in self.parser.parse(fmt.text(buf), fmt):
+                    filefmt = self.filefmts.guess(buf)
+                    linefmt = self.linefmts.guess(buf)
+                    entries = self.parser.parse(
+                        filefmt.text(buf),
+                        filefmt,
+                        linefmt
+                    )
+                    for entry in entries:
                         yield DigestEntry(
                                 digest=entry.digest,
                                 flag=entry.flag if self.flag is None else self.flag,
