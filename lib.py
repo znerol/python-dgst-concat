@@ -94,7 +94,7 @@ class DigestLineFormat(object):
         """
         Return true if the parser matches the given line.
         """
-        chunk = buf.peek().decode()
+        chunk = buf.peek().decode(errors='ignore')
         return self._pattern.match(chunk) is not None
 
     def parse(self, line: str, filefmt: DigestFileFormat) -> DigestEntry:
