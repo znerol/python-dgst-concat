@@ -3,7 +3,7 @@
 import argparse
 import sys
 from pathlib import Path
-from lib import DigestList
+from lib import DigestList, PathFilters
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Recursively concatenate coreutils digest files.')
@@ -39,8 +39,6 @@ if __name__ == "__main__":
 
     outpath = Path(args.outfile.name) if args.outfile != sys.stdout else None
     for pattern in args.patterns:
-        dgstfiles = list(Path('.').glob(pattern))
-        while outpath in dgstfiles:
-            dgstfiles.remove(outpath)
+        dgstfiles = list(filter(PathFilters(outpath), Path('.').glob(pattern)))
         for entry in DigestList(flag=flag).join(dgstfiles):
             print(f'{entry.digest} {entry.flag}{entry.path}', file=args.outfile)

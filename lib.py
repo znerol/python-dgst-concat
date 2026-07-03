@@ -193,6 +193,51 @@ class DigestParser(object):
         for line in lines:
             yield linefmt.parse(line, filefmt)
 
+class OutpathPathFilter(object):
+    """
+    Rejects the output file.
+    """
+
+    def __init__(self, outpath=None):
+        self.outpath = outpath
+
+    def __call__(self, path):
+        return path != self.outpath
+
+class IgnorablePathsFilter(object):
+    """
+    Rejects ignorable system paths.
+    """
+
+    def __init__(self, patterns=None):
+        self.patterns = patterns if patterns != None else [
+            "$RECYCLE.BIN/**",
+            "System Volume Information/**",
+            ".git/**",
+        ]
+
+    def __call__(self, path):
+        for pattern in self.patterns:
+            if path.full_match(pattern):
+                return False
+        return True
+
+class PathFilters(object):
+    """
+    Standard path filters.
+    """
+
+    def __init__(self, outpath=None, patterns=None):
+        self.filters = [
+            OutpathPathFilter(outpath),
+            IgnorablePathsFilter(patterns)
+        ]
+
+    def __call__(self, path):
+        for filter in self.filters:
+            if not filter(path):
+                return False
+        return True
 
 class DigestList(object):
     """
