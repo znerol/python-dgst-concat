@@ -223,7 +223,7 @@ class DigestList(object):
             with dgstfile.open('rb') as buf:
                 try:
                     # Skip UTF-8 BOM if any.
-                    if buf.peek(3) == b'\xef\xbb\xbf':
+                    if buf.peek(3).startswith(b'\xef\xbb\xbf'):
                         buf.seek(3)
                     filefmt = self.filefmts.guess(buf)
                     linefmt = self.linefmts.guess(buf)
