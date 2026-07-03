@@ -37,6 +37,10 @@ if __name__ == "__main__":
     if args.text:
         flag = ' '
 
+    outpath = Path(args.outfile.name) if args.outfile != sys.stdout else None
     for pattern in args.patterns:
-        for entry in DigestList(flag=flag).join(Path('.').glob(pattern)):
+        dgstfiles = list(Path('.').glob(pattern))
+        while outpath in dgstfiles:
+            dgstfiles.remove(outpath)
+        for entry in DigestList(flag=flag).join(dgstfiles):
             print(f'{entry.digest} {entry.flag}{entry.path}', file=args.outfile)
