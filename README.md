@@ -4,6 +4,10 @@ Digest Concat
 A collection of python 3 scripts to collect and concatenate coreutils digest
 files.
 
+Requirements
+------------
+
+Requires Python 3.13 or better.
 
 Usage
 -----
