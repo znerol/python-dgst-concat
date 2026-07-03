@@ -222,6 +222,9 @@ class DigestList(object):
             dirname = dgstfile.parent
             with dgstfile.open('rb') as buf:
                 try:
+                    # Skip UTF-8 BOM if any.
+                    if dgstfile.peek(3) == b'\xef\xbb\xbf':
+                        dgstfile.seek(3)
                     filefmt = self.filefmts.guess(buf)
                     linefmt = self.linefmts.guess(buf)
                     entries = self.parser.parse(
