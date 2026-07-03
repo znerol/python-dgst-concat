@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from lib import DigestList
+from lib import DigestList, PathFilters
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Recursively walk a filesystem hierarchy and concatenate digest files into one file per directory.')
@@ -40,10 +40,8 @@ if __name__ == "__main__":
     for (dirpath, _, _) in os.walk(Path('.')):
         outpath = Path(dirpath) / args.outname
         for pattern in args.patterns:
-            dgstfiles = list(Path(dirpath).glob(pattern))
-            while outpath in dgstfiles:
-                dgstfiles.remove(outpath)
-            if dgstfiles:
+            dgstfiles = list(filter(PathFilters(outpath), Path(dirpath).glob(pattern)))
+            if len(dgstfiles) > 0:
                 with outpath.open('w') as outfile:
                     for entry in DigestList(flat=True, flag=flag).join(dgstfiles):
                         print(f'{entry.digest} {entry.flag}{entry.path}', file=outfile)
