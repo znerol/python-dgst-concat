@@ -222,6 +222,9 @@ class DigestList(object):
             dirname = dgstfile.parent
             with dgstfile.open('rb') as buf:
                 try:
+                    # Skip empty files.
+                    if buf.peek(1) == b'':
+                        continue
                     # Skip UTF-8 BOM if any.
                     if buf.peek(3).startswith(b'\xef\xbb\xbf'):
                         buf.seek(3)
